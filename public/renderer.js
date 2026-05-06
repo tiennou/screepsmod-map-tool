@@ -3,8 +3,6 @@ window.q = window.Q
 
 let floodTolerance = 37
 
-let generateOptions = {}
-
 let mp = { x: 0, y: 0 }
 let mb = { left: false, right: false }
 let vp = { x: 0, y: 0, z: 1 }
@@ -524,14 +522,19 @@ setInterval(() => {
   }
 }, 100)
 
-function gen(room) {
+function gen(room, opts) {
   let ind = window.terrain.findIndex(r => r.room === room)
   if (~ind) {
     window.terrain.splice(ind, 1)
   }
   delete terrainCache[room]
-  let opts = generateOptions
-  // worker.postMessage({ action: 'generate', room, terrainCache, opts })
+  opts ??= {}
+  if (opts.wallChance === undefined) {
+    opts.wallChance = document.querySelector('[name=wallChance]').valueAsNumber / 100
+  }
+  if (opts.twoSourcesChance === undefined) {
+    opts.twoSourcesChance = document.querySelector('[name=twoSourcesChance]').valueAsNumber / 100
+  }
   let id = Math.random().toString(36).slice(2)
   pool.queue.unshift({
     action: 'generate',
@@ -539,8 +542,6 @@ function gen(room) {
     terrainCache,
     opts,
     id,
-    twoSourcesChance:  parseInt(document.querySelector('[name=twoSourcesChance]').value) / 100,
-    wallChance: parseInt(document.querySelector('[name=wallChance]').value) / 100
   })
   return new Promise((resolve, reject) => {
     pool.cbs[id] = { resolve, reject }
