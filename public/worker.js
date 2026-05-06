@@ -8,13 +8,7 @@ addEventListener('message', msg => {
     self.terrainCache = msg.data.terrainCache
     let [x, y] = utils.roomNameToXY(msg.data.room)
     const [, lon, lat] = msg.data.room.match(/^[WE](\d+)[NS](\d+)$/)
-    let rx = lon % 10
-    let ry = lat % 10
-    let hall = rx == 0 || ry == 0
-    let center = rx == 5 && ry == 5
-    let sk = !center && rx >= 4 && rx <= 6 && ry >= 4 && ry <= 6
-    let normal = !sk && !center && !hall
-    let type = normal ? 'normal' : (sk ? 'sk' : (center ? 'center' : 'hall'))
+    const type = utils.roomTypeFromRoom(msg.data.room)
     let opts = Object.assign({}, msg.data.opts || {})
     const depositTypes = [C.RESOURCE_SILICON, C.RESOURCE_METAL, C.RESOURCE_BIOMASS, C.RESOURCE_MIST]
     let map = {
@@ -47,7 +41,7 @@ addEventListener('message', msg => {
 
     console.log(`${msg.data.room}-${JSON.stringify(opts)}`)
     generateRoom(msg.data.room, opts).then(room => {
-      if (sk || center) {
+      if (type === 'sk' || type === 'center') {
         let min = room.objects.find(o => o.type == 'mineral')
         let { x, y } = min
         if (!room.objects.find(o => o.type == 'extractor')) {

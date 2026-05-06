@@ -120,6 +120,21 @@ const utils = {
     }
     return [x, y]
   },
+  roomTypeFromRoom(roomName) {
+    const m = roomName.match(/^[WE](\d+)[NS](\d+)$/)
+    if (!m) return null
+    const lon = parseInt(m[1], 10)
+    const lat = parseInt(m[2], 10)
+    const rx = lon % 10
+    const ry = lat % 10
+    const hall = rx === 0 || ry === 0
+    const center = rx === 5 && ry === 5
+    const sk = !center && rx >= 4 && rx <= 6 && ry >= 4 && ry <= 6
+    if (hall) return 'hall'
+    if (center) return 'center'
+    if (sk) return 'sk'
+    return 'normal'
+  },
   writePng (colors, width, height) {
     let image = new ImageData(width, height)
     for (var y = 0; y < height; y++) {
