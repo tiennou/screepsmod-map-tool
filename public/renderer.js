@@ -233,9 +233,10 @@ const controlHintsByTool = {
 }
 
 let lastControlHintsTool = null
+let lastRoomGenerationVisibilityTool = null
 
 function getControlHintsToolTitle() {
-  const sel = document.querySelector('.controlpanel select')
+  const sel = document.getElementById('mouse-tool-select')
   if (!sel) return currentTool
   const opt = sel.options[sel.selectedIndex]
   return (opt && opt.textContent.trim()) || currentTool
@@ -262,6 +263,50 @@ function syncControlHints() {
     { combo: '—', desc: 'No bindings for this tool' },
   ]
   if (toolUl) fillControlHintsList(toolUl, toolRows)
+}
+
+function syncToolSections() {
+  if (lastRoomGenerationVisibilityTool === currentTool) return
+  lastRoomGenerationVisibilityTool = currentTool
+  const roomGenSection = document.getElementById('room-generation-section')
+  if (!roomGenSection) return
+  roomGenSection.style.display = currentTool === 'gen' ? '' : 'none'
+}
+
+function initControlPanelUI() {
+  const panel = document.getElementById('controlpanel')
+  const toggleBtn = document.getElementById('controlpanel-toggle')
+  const hintsToggleBtn = document.getElementById('control-hints-toggle')
+  const hints = document.getElementById('control-hints')
+  if (!panel || !toggleBtn) return
+
+  const updateFoldButton = () => {
+    const collapsed = panel.classList.contains('collapsed')
+    toggleBtn.textContent = collapsed ? '▸' : '▾'
+    toggleBtn.title = collapsed ? 'Expand panel' : 'Fold panel'
+  }
+
+  const updateHintsButton = () => {
+    if (!hintsToggleBtn || !hints) return
+    const collapsed = hints.classList.contains('is-collapsed')
+    hintsToggleBtn.textContent = collapsed ? 'Controls ▸' : 'Controls ▾'
+  }
+
+  toggleBtn.addEventListener('click', () => {
+    panel.classList.toggle('collapsed')
+    updateFoldButton()
+  })
+
+  if (hintsToggleBtn && hints) {
+    hintsToggleBtn.addEventListener('click', () => {
+      hints.classList.toggle('is-collapsed')
+      updateHintsButton()
+    })
+    updateHintsButton()
+  }
+
+  updateFoldButton()
+  syncToolSections()
 }
 
 function logMapClick(room, x, y) {
@@ -389,6 +434,7 @@ function isInView(x, y, w, h) {
 
 function render() {
   syncControlHints()
+  syncToolSections()
   let canvas = document.getElementById('canvas')
   let ctx = canvas.getContext('2d')
   ctx.save()
@@ -583,6 +629,7 @@ function loop() {
 }
 
 loop()
+initControlPanelUI()
 
 function resize() {
   canvas.width = window.innerWidth

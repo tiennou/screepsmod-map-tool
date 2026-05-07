@@ -13,69 +13,69 @@
 	</head>
 	<body onpageshow="refreshSlidersOnPageLoad()">
 		<canvas id="canvas"></canvas>
-		<div class="controlpanel">
-			<div>
-				<div>Mouse Tool :</div>				
-				<select oninput="currentTool = this.value">
-					<option value="gen">Generate Rooms</option>
-					<option value="edit">Edit Room Terrain</option>
-					<option value="mineral">Cycle mineral</option>
-					<option value="access">Open/Close Rooms</option>
-					<option value="resourceCopy">Resource distribution copy</option>
-					<option selected value="block">No Tool Selected</option>					
-				</select>
-			<div>
-			<div>
-				<button onclick="generateSolidWall()">Generate Walls</button>
+		<div class="controlpanel" id="controlpanel">
+			<div class="controlpanel-section controlpanel-hints-panel">
+				<button id="control-hints-toggle" class="controlpanel-section-toggle" type="button">Hints ▾</button>
+				<div id="control-hints" class="control-hints" aria-live="polite">
+					<div class="control-hints-header">
+						<span class="control-hints-kicker">Bindings for</span>
+						<span id="control-hints-tool-label" class="control-hints-tool-label"></span>
+					</div>
+					<div class="control-hints-section">Map</div>
+					<ul id="control-hints-global" class="control-hints-list"></ul>
+					<div class="control-hints-section">Tool</div>
+					<ul id="control-hints-tool-list" class="control-hints-list"></ul>
+				</div>
 			</div>
-			<div>
-				<button onclick="fixAll()">Fix All Rooms</button>
+
+			<div class="controlpanel-section controlpanel-mouse-tool">
+				<div class="controlpanel-toolbar">
+					<div class="controlpanel-select-wrap">
+						<label for="mouse-tool-select" class="controlpanel-label">Mouse Tool</label>
+						<select id="mouse-tool-select" oninput="currentTool = this.value">
+							<option value="gen">Generate Rooms</option>
+							<option value="edit">Edit Room Terrain</option>
+							<option value="mineral">Cycle mineral</option>
+							<option value="access">Open/Close Rooms</option>
+							<option value="resourceCopy">Resource distribution copy</option>
+							<option selected value="block">No Tool Selected</option>
+						</select>
+					</div>
+					<button id="controlpanel-toggle" class="controlpanel-icon-btn" type="button" title="Fold panel">▾</button>
+				</div>
 			</div>
-			<div>
-				<div id="wallChance">Walls Chance</div>
-				<input id="wallChanceInput" type="range" name="wallChance" value="25" min="0" max="100" step="1" 
-				oninput="updateSliderText('wallChance', 'Walls Chance[' + this.value + '%]')">
-				
+
+			<div id="room-generation-section" class="controlpanel-section">
+				<div class="controlpanel-section-title">Room Generation</div>
+				<div class="controlpanel-field">
+					<div id="wallChance">Walls Chance</div>
+					<input id="wallChanceInput" type="range" name="wallChance" value="25" min="0" max="100" step="1"
+						oninput="updateSliderText('wallChance', 'Walls Chance[' + this.value + '%]')">
+				</div>
+				<div class="controlpanel-field">
+					<div id="sourceChance">2 Source chance</div>
+					<input id="sourceChanceInput" type="range" name="twoSourcesChance" value="75" min="0" max="100" step="1"
+						oninput="updateSliderText('sourceChance', '2 Source chance[' + this.value + '%]')">
+				</div>
+				<div class="controlpanel-checks">
+					<label><input type="checkbox" id="showWalls"> Show Walls</label>
+					<label><input type="checkbox" id="showMinerals"> Show Minerals</label>
+				</div>
 			</div>
-			<div>
-				<div id="sourceChance">2 Source chance</div>
-				<input id="sourceChanceInput" type="range" name="twoSourcesChance" value="75" min="0" max="100" step="1" 
-				oninput="updateSliderText('sourceChance', '2 Source chance[' + this.value + '%]')">
+
+			<div class="controlpanel-section">
+				<div class="controlpanel-section-title">Global Generation</div>
+				<div class="controlpanel-buttons">
+					<button onclick="generateSolidWall()">Generate Walls</button>
+					<button onclick="fixAll()">Fix All Rooms</button>
+					<button onclick="generateSector('W5N5')">Gen Default</button>
+					<button onclick="autoGen(2,2)">Auto Gen (2x2)</button>
+					<button onclick="autoGen(4,2)">Auto Gen (4x2)</button>
+					<button onclick="autoGen(4,4)">Auto Gen (4x4)</button>
+					<button onclick="save(true)">Save</button>
+				</div>
 			</div>
-			<div>
-			<label>
-				<input type="checkbox" id="showWalls">
-				Show Walls
-			</label>
-			<label>
-				<input type="checkbox" id="showMinerals">
-				Show Minerals
-			</label>
-			<div>
-				<button onclick="generateSector('W5N5')">Gen Default</button>
-			</div>
-			<div>
-				<button onclick="autoGen(2,2)">Auto Gen (2x2)</button>
-			</div>
-			<div>
-				<button onclick="autoGen(4,2)">Auto Gen (4x2)</button>
-			</div>
-				<button onclick="autoGen(4,4)">Auto Gen (4x4)</button>
-			</div>
-				<button onclick="save(true)">Save</button>
-			</div>
-		</div>
 		</div>
 		<textarea id="output"></textarea>
-		<div id="control-hints" class="control-hints" aria-live="polite">
-			<div class="control-hints-header">
-				<span class="control-hints-kicker">Controls</span>
-				<span id="control-hints-tool-label" class="control-hints-tool-label"></span>
-			</div>
-			<div class="control-hints-section">Map</div>
-			<ul id="control-hints-global" class="control-hints-list"></ul>
-			<div class="control-hints-section">Tool</div>
-			<ul id="control-hints-tool-list" class="control-hints-list"></ul>
-		</div>
 	</body>
 </html>
