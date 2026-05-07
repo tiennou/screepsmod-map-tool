@@ -6,6 +6,7 @@ let floodTolerance = 37
 let mp = { x: 0, y: 0 }
 let mb = { left: false, right: false }
 let vp = { x: 0, y: 0, z: 1 }
+let hoverModifiers = { ctrlKey: false, shiftKey: false, altKey: false, metaKey: false }
 
 let scale = 1
 let flood = false
@@ -123,6 +124,12 @@ canvas.addEventListener('mousemove', e => {
   let rx = Math.floor((x / scale) % 50)
   let ry = Math.floor((y / scale) % 50)
   mp = { x: e.clientX, y: e.clientY, rx, ry }
+  hoverModifiers = {
+    ctrlKey: e.ctrlKey,
+    shiftKey: e.shiftKey,
+    altKey: e.altKey,
+    metaKey: e.metaKey
+  }
   if (mb.left) {
     let { x, y, ovp } = mb.left
     let dx = mp.x - x
@@ -147,48 +154,73 @@ canvas.addEventListener('mousedown', e => {
     altKey: e.altKey,
     metaKey: e.metaKey
   }
+  hoverModifiers = {
+    ctrlKey: e.ctrlKey,
+    shiftKey: e.shiftKey,
+    altKey: e.altKey,
+    metaKey: e.metaKey
+  }
 })
 
 const tools = {
   gen: [
-    { key: 'left', action: ({ room }) => gen(room) },
-    { key: 'ctrl+left', action: ({ room }) => generateSector(room) },
+    { key: 'left', scope: 'room', action: ({ room }) => gen(room) },
+    { key: 'ctrl+left', scope: 'sector', action: ({ room }) => generateSector(room) },
     {
       key: 'alt+left',
+      scope: 'room',
       action: ({ e }) => {
         flood = flood ? false : { x: e.clientX, y: e.clientY }
       }
     },
-    { key: 'right',  action: ({ room }) => del(room) },
-    { key: 'alt+right', action: ({ room }) => makeSolidRoom(room) },
-    { key: 'ctrl+right', action: ({ room }) => deleteSector(room) },
-    { key: 'alt+ctrl+right', action: ({ room }) => makeSolidSector(room) },
+    { key: 'right', scope: 'room', action: ({ room }) => del(room) },
+    { key: 'alt+right', scope: 'room', action: ({ room }) => makeSolidRoom(room) },
+    { key: 'ctrl+right', scope: 'sector', action: ({ room }) => deleteSector(room) },
+    { key: 'alt+ctrl+right', scope: 'sector', action: ({ room }) => makeSolidSector(room) },
   ],
   edit: [
-    { key: 'left', action: ({ room, x, y }) => editTerrain(room, x, y, 'wall') },
-    { key: 'alt+left', action: ({ room, x, y }) => editTerrain(room, x, y, 'swamp') },
-    { key: 'right', action: ({ room, x, y }) => editTerrain(room, x, y, 'plain') }
+    { key: 'left', scope: 'room', action: ({ room, x, y }) => editTerrain(room, x, y, 'wall') },
+    { key: 'alt+left', scope: 'room', action: ({ room, x, y }) => editTerrain(room, x, y, 'swamp') },
+    { key: 'right', scope: 'room', action: ({ room, x, y }) => editTerrain(room, x, y, 'plain') }
   ],
   mineral: [
-    { key: 'left', action: ({ room }) => cycleMineral(room) },
-    { key: 'right', action: ({ room }) => cycleMineral(room, false) },
+    { key: 'left', scope: 'room', action: ({ room }) => cycleMineral(room) },
+    { key: 'right', scope: 'room', action: ({ room }) => cycleMineral(room, false) },
   ],
   access: [
-    { key: 'left', action: ({ room }) => changeRoomStatus(getRoomFromName(room), 'normal') },
-    { key: 'ctrl+left', action: ({ room }) => changeSectorStatus(room, 'normal') },
-    { key: 'right', action: ({ room }) => changeRoomStatus(getRoomFromName(room), 'out of borders') },
-    { key: 'ctrl+right', action: ({ room }) => changeSectorStatus(room, 'out of borders') }
+    { key: 'left', scope: 'room', action: ({ room }) => changeRoomStatus(getRoomFromName(room), 'normal') },
+    { key: 'ctrl+left', scope: 'sector', action: ({ room }) => changeSectorStatus(room, 'normal') },
+    { key: 'right', scope: 'room', action: ({ room }) => changeRoomStatus(getRoomFromName(room), 'out of borders') },
+    { key: 'ctrl+right', scope: 'sector', action: ({ room }) => changeSectorStatus(room, 'out of borders') }
   ],
   block: [
-    { key: 'left', action: ({ room, x, y }) => logMapClick(room, x, y) },
-    { key: 'alt+left', action: ({ room, x, y }) => logMapClick(room, x, y) },
-    { key: 'right', action: ({ room, x, y }) => logMapClick(room, x, y) }
+    { key: 'left', scope: 'room', action: ({ room, x, y }) => logMapClick(room, x, y) },
+    { key: 'alt+left', scope: 'room', action: ({ room, x, y }) => logMapClick(room, x, y) },
+    { key: 'right', scope: 'room', action: ({ room, x, y }) => logMapClick(room, x, y) }
   ],
   resourceCopy: [
-    { key: 'ctrl+left', action: ({ room }) => resourceCopySetTemplate(room) },
-    { key: 'left', action: ({ room }) => { resourceCopyApply(room).catch(e => console.error(e)) } },
-    { key: 'right', action: () => { resourceCopyClearTemplate() } },
+    { key: 'ctrl+left', scope: 'sector', action: ({ room }) => resourceCopySetTemplate(room) },
+    { key: 'left', scope: 'sector', action: ({ room }) => { resourceCopyApply(room).catch(e => console.error(e)) } },
+    { key: 'right', scope: 'sector', action: () => { resourceCopyClearTemplate() } },
   ]
+}
+
+function buildInputKey(button = 'left', modifiers = hoverModifiers) {
+  const keys = []
+  if (modifiers.ctrlKey) keys.push('ctrl')
+  if (modifiers.shiftKey) keys.push('shift')
+  if (modifiers.altKey) keys.push('alt')
+  if (modifiers.metaKey) keys.push('meta')
+  keys.push(button)
+  return keys.join('+')
+}
+
+function getHoverScope() {
+  const tool = getTool() || []
+  const button = mb.right ? 'right' : 'left'
+  const key = buildInputKey(button)
+  const binding = tool.find(t => t.key === key)
+  return (binding && binding.scope) || 'room'
 }
 
 const controlHintsGlobal = [
@@ -325,7 +357,7 @@ function changeRoomStatus(room, status) {
 }
 
 function changeSectorStatus(roomNameInSector, status) {
-  let { start, end } = getSectorBounds(roomNameInSector, "none")
+  let { start, end } = getSectorHoverBounds(roomNameInSector)
   for (let x = start.x; x < end.x; x++) {
     for (let y = start.y; y < end.y; y++) {
       changeRoomStatus(getRoomFromXY(x, y), status)
@@ -411,7 +443,23 @@ function arrow(e) {
     vp.x -= speed * scale
   }
 }
-window.addEventListener('keyup', (e) => arrow(e))
+window.addEventListener('keydown', (e) => {
+  hoverModifiers = {
+    ctrlKey: e.ctrlKey,
+    shiftKey: e.shiftKey,
+    altKey: e.altKey,
+    metaKey: e.metaKey
+  }
+})
+window.addEventListener('keyup', (e) => {
+  arrow(e)
+  hoverModifiers = {
+    ctrlKey: e.ctrlKey,
+    shiftKey: e.shiftKey,
+    altKey: e.altKey,
+    metaKey: e.metaKey
+  }
+})
 
 window.oncontextmenu = function (event) {
   event.preventDefault()
@@ -466,19 +514,23 @@ function render() {
     let ry = y - y % (50 * scale)
     cell = { x: rx / (50 * scale), y: ry / (50 * scale) }
     cell.room = utils.roomNameFromXY(cell.x, cell.y)
-    ctx.beginPath()
-    ctx.rect(rx, ry, (50 * scale), (50 * scale))
-    ctx.strokeStyle = 'red'
-    ctx.stroke()
 
-    let { start, end } = getSectorBounds(cell.room)
+    const hoverScope = getHoverScope()
     let s = 50 * scale
+    let markerX = rx
+    let markerY = ry
+    let markerW = 50 * scale
+    let markerH = 50 * scale
+    if (hoverScope === 'sector') {
+      let { start, end } = getSectorHoverBounds(cell.room)
+      markerX = start.x * s
+      markerY = start.y * s
+      markerW = Math.abs(end.x - start.x) * s
+      markerH = Math.abs(end.y - start.y) * s
+    }
+    const outset = Math.max(1, Math.floor(scale * 0.75))
     ctx.beginPath()
-    let w = Math.abs(end.x - start.x)
-    let h = Math.abs(end.y - start.y)
-    // if (start.x >= 0) start.x += 1
-    // if (start.y >= 0) start.y += 1
-    ctx.rect(start.x * s, start.y * s, w * s, h * s)
+    ctx.rect(markerX - outset, markerY - outset, markerW + (outset * 2), markerH + (outset * 2))
     ctx.strokeStyle = 'yellow'
     ctx.stroke()
   }
@@ -832,6 +884,45 @@ function getSectorBounds(roomNameInSector, busOption) {
   return { start, end }
 }
 
+function getSectorHoverBounds(roomNameInSector) {
+  const [x, y] = utils.roomNameToXY(roomNameInSector)
+  const interior = getSectorBounds(roomNameInSector, 'none')
+  const all = getSectorBounds(roomNameInSector, 'all')
+
+  const inInterior = (
+    x >= interior.start.x &&
+    x < interior.end.x &&
+    y >= interior.start.y &&
+    y < interior.end.y
+  )
+  if (inInterior) return interior
+
+  // Hovering highways: select the full highway strip (1 room wide) across
+  // the 11x11 sector bounds, rather than the entire sector.
+  if (x < interior.start.x) {
+    return {
+      start: { x: all.start.x, y: all.start.y },
+      end: { x: all.start.x + 1, y: all.end.y }
+    }
+  }
+  if (x >= interior.end.x) {
+    return {
+      start: { x: all.end.x - 1, y: all.start.y },
+      end: { x: all.end.x, y: all.end.y }
+    }
+  }
+  if (y < interior.start.y) {
+    return {
+      start: { x: all.start.x, y: all.start.y },
+      end: { x: all.end.x, y: all.start.y + 1 }
+    }
+  }
+  return {
+    start: { x: all.start.x, y: all.end.y - 1 },
+    end: { x: all.end.x, y: all.end.y }
+  }
+}
+
 function makeRespawnSectorWall(room, borderSide, decayTime) {
   let x, y, x2, y2
   // Edges
@@ -999,17 +1090,9 @@ function makeSolidRoom(room) {
 async function generateSector(room) {
   let p1 = []
   let p2 = []
-  let { start, end } = getSectorBounds(room)
-  if (start.x < 0) {
-    start.x -= 1
-    end.x -= 1
-  }
-  if (start.y < 0) {
-    start.y -= 1
-    end.y -= 1
-  }
-  for (let x = start.x; x < end.x + 1; x++) {
-    for (let y = start.y; y < end.y + 1; y++) {
+  let { start, end } = getSectorHoverBounds(room)
+  for (let x = start.x; x < end.x; x++) {
+    for (let y = start.y; y < end.y; y++) {
       let room = utils.roomNameFromXY(x, y)
       if (x % 2 === y % 2) {
         p1.push(room)
@@ -1026,7 +1109,7 @@ async function generateSector(room) {
 }
 
 function makeSolidSector(room) {
-  let { start, end } = getSectorBounds(room)
+  let { start, end } = getSectorHoverBounds(room)
   for (let x = start.x; x < end.x; x++) {
     for (let y = start.y; y < end.y; y++) {
       makeSolidRoom(utils.roomNameFromXY(x, y))
@@ -1035,7 +1118,7 @@ function makeSolidSector(room) {
 }
 
 function deleteSector(room) {
-  let { start, end } = getSectorBounds(room)
+  let { start, end } = getSectorHoverBounds(room)
   for (let x = start.x; x < end.x; x++) {
     for (let y = start.y; y < end.y; y++) {
       del(utils.roomNameFromXY(x, y))
@@ -1046,7 +1129,7 @@ function deleteSector(room) {
 let resourceCopyTemplate = null
 
 function getAllSectorRooms(anchorRoom) {
-  const coords = getSectorBounds(anchorRoom, 'none')
+  const coords = getSectorHoverBounds(anchorRoom)
   const names = []
   for (let x = coords.start.x; x < coords.end.x; x++) {
     for (let y = coords.start.y; y < coords.end.y; y++) {
