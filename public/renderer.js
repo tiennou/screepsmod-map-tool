@@ -177,6 +177,11 @@ const tools = {
     { key: 'left', action: ({ room, x, y }) => logMapClick(room, x, y) },
     { key: 'alt+left', action: ({ room, x, y }) => logMapClick(room, x, y) },
     { key: 'right', action: ({ room, x, y }) => logMapClick(room, x, y) }
+  ],
+  resourceCopy: [
+    { key: 'ctrl+left', action: ({ room }) => resourceCopySetTemplate(room) },
+    { key: 'left', action: ({ room }) => { resourceCopyApply(room).catch(e => console.error(e)) } },
+    { key: 'right', action: () => { resourceCopyClearTemplate() } },
   ]
 }
 
@@ -910,6 +915,186 @@ function deleteSector(room) {
   }
 }
 
+let resourceCopyTemplate = null
+
+function getAllSectorRooms(anchorRoom) {
+  const coords = getSectorBounds(anchorRoom, 'none')
+  const names = []
+  for (let x = coords.start.x; x < coords.end.x; x++) {
+    for (let y = coords.start.y; y < coords.end.y; y++) {
+      names.push(utils.roomNameFromXY(x, y))
+    }
+  }
+  return names
+}
+
+function getAllSectorRoomsWithSources(anchorRoom, sourceCount) {
+  return getAllSectorRooms(anchorRoom).filter(roomName => {
+    if (utils.roomTypeFromRoom(roomName) === 'hall') return false
+    const r = getRoomFromName(roomName)
+    if (!r) return false
+    return r.objects.filter(o => o.type === 'source').length === sourceCount
+  })
+}
+
+function getAllSectorRoomsWithMineral(anchorRoom, mineralType) {
+  return getAllSectorRooms(anchorRoom).filter(roomName => {
+    const r = getRoomFromName(roomName)
+    if (!r) return false
+    const m = r.objects.find(o => o.type === 'mineral')
+    return !!(m && m.mineralType === mineralType)
+  })
+}
+
+function getSkSectorRoomNames(anchorRoom) {
+  return getAllSectorRooms(anchorRoom).filter(nm => ['sk', 'center'].includes(utils.roomTypeFromRoom(nm)))
+}
+
+function getSkSectorMinerals(anchorRoom) {
+  return getStats(getSkSectorRoomNames(anchorRoom), true).minerals
+}
+
+function getAllSkSectorRoomsWithMineral(anchorRoom, mineralType) {
+  return getSkSectorRoomNames(anchorRoom).filter(roomName => {
+    const r = getRoomFromName(roomName)
+    if (!r) return false
+    const m = r.objects.find(o => o.type === 'mineral')
+    return !!(m && m.mineralType === mineralType)
+  })
+}
+
+function resourceCopySetTemplate(anchorRoom) {
+  resourceCopyTemplate = anchorRoom
+}
+
+function resourceCopyClearTemplate() {
+  resourceCopyTemplate = null
+}
+
+async function resourceCopyApply(targetRoom) {
+  if (!resourceCopyTemplate) {
+    alert('Sector pattern tool: Ctrl+left click a sector to set a template first.')
+    return
+  }
+  const templateRoom = resourceCopyTemplate
+  const templateStats = getStats(templateRoom)
+  const templateSkSectorMinerals = getSkSectorMinerals(templateRoom)
+  let targetStats = getStats(targetRoom)
+
+  const MAX = 512
+  for (let iter = 0; iter < MAX; iter++) {
+    targetStats = getStats(targetRoom)
+    const targetSkSectorMinerals = getSkSectorMinerals(targetRoom)
+    const mineralKeys = [...new Set([
+      ...Object.keys(templateStats.minerals),
+      ...Object.keys(targetStats.minerals),
+      ...Object.keys(templateSkSectorMinerals),
+      ...Object.keys(targetSkSectorMinerals)
+    ])]
+    if (
+      targetStats.doubleSource === templateStats.doubleSource
+      && mineralKeys.every(k => targetStats.minerals[k] === templateStats.minerals[k])
+      && mineralKeys.every(k => targetSkSectorMinerals[k] === templateSkSectorMinerals[k])
+    ) {
+      getStats(targetRoom)
+      alert(`Resource distribution match after ${iter} step(s). Save to persist.`)
+      return
+    }
+
+    const dDouble = templateStats.doubleSource - targetStats.doubleSource
+    if (dDouble !== 0) {
+      const needsMore = dDouble > 0
+      const cands = getAllSectorRoomsWithSources(targetRoom, needsMore ? 1 : 2)
+      const pick = _.sample(cands)
+      if (!pick) {
+        console.warn(`resource-copy: template wants ${needsMore ? 'more' : 'fewer'} double-source normals but target has no ${needsMore ? '1' : '2'}-source normal rooms.`)
+        return
+      }
+      const prevRoom = getRoomFromName(pick)
+      const mineral = prevRoom && prevRoom.objects.find(o => o.type === 'mineral')
+      const hint = { twoSourcesChance: needsMore ? 1 : 0 }
+      if (mineral) hint.mineral = mineral.mineralType
+      await gen(pick, hint)
+      continue
+    }
+
+    const skSectorUneven = mineralKeys.some(k => targetSkSectorMinerals[k] !== templateSkSectorMinerals[k])
+    let lacking
+    let donor
+    let donorRooms
+
+    if (skSectorUneven) {
+      lacking = _.sample(mineralKeys.filter(k => templateSkSectorMinerals[k] > targetSkSectorMinerals[k]))
+      if (!lacking) {
+        console.warn('resource-copy: SK sector minerals mismatched but no deficient type', { targetSkSectorMinerals, templateSkSectorMinerals })
+        return
+      }
+      donor = null
+      let hip = -1
+      for (const m of mineralKeys) {
+        if (targetSkSectorMinerals[m] > templateSkSectorMinerals[m] && targetSkSectorMinerals[m] > hip) {
+          hip = targetSkSectorMinerals[m]
+          donor = m
+        }
+      }
+      if (!donor) {
+        console.warn('resource-copy: SK sector minerals misaligned but no surplus in SK sector to take from', { targetSkSectorMinerals, templateSkSectorMinerals })
+        return
+      }
+      if (donor === lacking) {
+        donor = _.maxBy(mineralKeys.filter(m => m !== lacking && targetSkSectorMinerals[m] > templateSkSectorMinerals[m]), k => targetSkSectorMinerals[k])
+        if (!donor) {
+          console.warn('resource-copy: could not choose donor mineral distinct from deficient type (SK sector)')
+          return
+        }
+      }
+      donorRooms = getAllSkSectorRoomsWithMineral(targetRoom, donor)
+      if (!donorRooms.length) {
+        console.warn(`resource-copy: expected SK sector rooms with donor mineral ${donor}`)
+        return
+      }
+    } else {
+      lacking = _.sample(mineralKeys.filter(k => templateStats.minerals[k] > targetStats.minerals[k]))
+      if (!lacking) {
+        console.warn('resource-copy: still differ without a numerical mineral deficit (counts)', { targetDoubleSources: targetStats.doubleSource, templateDoubleSources: templateStats.doubleSource, targetMinerals: targetStats.minerals, templateMinerals: templateStats.minerals })
+        return
+      }
+      donor = null
+      let hi = -1
+      for (const m of mineralKeys) {
+        if (targetStats.minerals[m] > templateStats.minerals[m] && targetStats.minerals[m] > hi) {
+          hi = targetStats.minerals[m]
+          donor = m
+        }
+      }
+      if (!donor) {
+        console.warn('resource-copy: mineral counts off template but no mineral is above template to take from', { targetMinerals: targetStats.minerals, templateMinerals: templateStats.minerals })
+        return
+      }
+      if (donor === lacking) {
+        donor = _.maxBy(mineralKeys.filter(m => m !== lacking && targetStats.minerals[m] > templateStats.minerals[m]), k => targetStats.minerals[k])
+        if (!donor) {
+          console.warn('resource-copy: could not choose donor mineral distinct from deficient type.')
+          return
+        }
+      }
+      donorRooms = getAllSectorRoomsWithMineral(targetRoom, donor)
+      if (!donorRooms.length) {
+        console.warn(`resource-copy: expected rooms with donor mineral ${donor}`)
+        return
+      }
+    }
+
+    const roomName = _.sample(donorRooms)
+    const r = getRoomFromName(roomName)
+    const min = r.objects.find(o => o.type === 'mineral')
+    min.mineralType = lacking
+    r.remote = false
+    console.log(`${roomName} mineral ${donor} -> ${lacking} (toward template distribution)`)
+  }
+  console.warn('resource-copy: stopped after max iterations (partial match). Compare getStats(template) / getStats(target).')
+}
+
 function createGrid() {
   let nodes = []
   let edges = []
@@ -1134,28 +1319,26 @@ async function fixAll() {
   alert(`All rooms fixed. Run save to apply.`)
 }
 
-function getStats(sectorRoom) {
+/** Pass a room name to use that sector’s interior, or an array of room names. */
+function getStats(sectorOrRoomNames) {
   const stats = {
     sources: 0,
     doubleSource: 0,
     minerals: { H: 0, O: 0, Z: 0, K: 0, U: 0, L: 0, X: 0, },
   }
-  const coords = getSectorBounds(sectorRoom, "none")
-  for (let x = coords.start.x; x < coords.end.x; x++) {
-    for (let y = coords.start.y; y < coords.end.y; y++) {
-      const name = utils.roomNameFromXY(x, y)
-      const room = terrain.find(r => (r.room || r.name) === name)
-      if (!room) continue
-      const sources = room.objects.filter(o => o.type === "source")
-      stats.sources += sources.length ?? 0
-      if (sources.length > 1) {
-        stats.doubleSource += 1
-      }
-      const mineral = room.objects.find(o => o.type === "mineral")
-      if (mineral) {
-        stats.minerals[mineral.mineralType] ??= 0
-        stats.minerals[mineral.mineralType]++
-      }
+  const names = Array.isArray(sectorOrRoomNames) ? sectorOrRoomNames : getAllSectorRooms(sectorOrRoomNames)
+  for (const name of names) {
+    const room = terrain.find(r => (r.room || r.name) === name)
+    if (!room) continue
+    const sources = room.objects.filter(o => o.type === "source")
+    stats.sources += sources.length ?? 0
+    if (sources.length > 1) {
+      stats.doubleSource += 1
+    }
+    const mineral = room.objects.find(o => o.type === "mineral")
+    if (mineral) {
+      stats.minerals[mineral.mineralType] ??= 0
+      stats.minerals[mineral.mineralType]++
     }
   }
   console.log(`sources: ${stats.sources}, double: ${stats.doubleSource}, mineral: ${Object.entries(stats.minerals).map(([m, n]) => `${n} of ${m}`).join(", ")}`)
