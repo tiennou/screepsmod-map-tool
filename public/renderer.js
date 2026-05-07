@@ -185,6 +185,79 @@ const tools = {
   ]
 }
 
+const controlHintsGlobal = [
+  { combo: 'Scroll wheel', desc: 'Zoom 1×–8× (toward cursor)' },
+  { combo: 'Drag (hold left)', desc: 'Pan map' },
+  { combo: 'Arrow keys', desc: 'Pan map' },
+]
+
+const controlHintsByTool = {
+  gen: [
+    { combo: 'Left-click', desc: 'Generate room' },
+    { combo: 'Ctrl+left-click', desc: 'Generate sector' },
+    { combo: 'Alt+left-click', desc: 'Toggle flood-fill preview' },
+    { combo: 'Right-click', desc: 'Delete room' },
+    { combo: 'Alt+right-click', desc: 'Fill room with wall' },
+    { combo: 'Ctrl+right-click', desc: 'Delete sector' },
+    { combo: 'Alt+Ctrl+right-click', desc: 'Fill sector with wall' },
+  ],
+  edit: [
+    { combo: 'Left-click', desc: 'Paint wall' },
+    { combo: 'Alt+left-click', desc: 'Paint swamp' },
+    { combo: 'Right-click', desc: 'Paint plain' },
+  ],
+  mineral: [
+    { combo: 'Left-click', desc: 'Next mineral type' },
+    { combo: 'Right-click', desc: 'Previous mineral type' },
+  ],
+  access: [
+    { combo: 'Left-click', desc: 'Set room open (normal)' },
+    { combo: 'Ctrl+left-click', desc: 'Open whole sector' },
+    { combo: 'Right-click', desc: 'Set room closed (out of borders)' },
+    { combo: 'Ctrl+right-click', desc: 'Close whole sector' },
+  ],
+  block: [
+    { combo: 'Click', desc: 'Log room & tile (console)' },
+  ],
+  resourceCopy: [
+    { combo: 'Ctrl+left-click', desc: 'Set sector template' },
+    { combo: 'Left-click', desc: 'Match resources to template' },
+    { combo: 'Right-click', desc: 'Clear template' },
+  ],
+}
+
+let lastControlHintsTool = null
+
+function getControlHintsToolTitle() {
+  const sel = document.querySelector('.controlpanel select')
+  if (!sel) return currentTool
+  const opt = sel.options[sel.selectedIndex]
+  return (opt && opt.textContent.trim()) || currentTool
+}
+
+function fillControlHintsList(ul, rows) {
+  ul.innerHTML = rows.map(
+    ({ combo, desc }) =>
+      `<li><span class="control-hints-combo">${combo}</span><span class="control-hints-desc">${desc}</span></li>`
+  ).join('')
+}
+
+function syncControlHints() {
+  if (lastControlHintsTool === currentTool) return
+  lastControlHintsTool = currentTool
+  const root = document.getElementById('control-hints')
+  if (!root) return
+  const titleEl = document.getElementById('control-hints-tool-label')
+  const globalUl = document.getElementById('control-hints-global')
+  const toolUl = document.getElementById('control-hints-tool-list')
+  if (titleEl) titleEl.textContent = getControlHintsToolTitle()
+  if (globalUl) fillControlHintsList(globalUl, controlHintsGlobal)
+  const toolRows = controlHintsByTool[currentTool] || [
+    { combo: '—', desc: 'No bindings for this tool' },
+  ]
+  if (toolUl) fillControlHintsList(toolUl, toolRows)
+}
+
 function logMapClick(room, x, y) {
   console.log(room, x, y)
 }
@@ -308,6 +381,7 @@ function isInView(x, y, w, h) {
 }
 
 function render() {
+  syncControlHints()
   let canvas = document.getElementById('canvas')
   let ctx = canvas.getContext('2d')
   ctx.save()
