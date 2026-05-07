@@ -140,7 +140,13 @@ canvas.addEventListener('mousedown', e => {
   let btn = btns[e.button] || 'right'
   let x = e.clientX
   let y = e.clientY
-  mb[btn] = { x, y, ovp: Object.assign({}, vp) }
+  mb[btn] = {
+    x, y, ovp: Object.assign({}, vp),
+    ctrlKey: e.ctrlKey,
+    shiftKey: e.shiftKey,
+    altKey: e.altKey,
+    metaKey: e.metaKey
+  }
 })
 
 const tools = {
@@ -307,9 +313,10 @@ canvas.addEventListener('mouseup', e => {
   let room = utils.roomNameFromXY(cell.x, cell.y)
   let btns = ['left', 'middle', 'right']
   let btn = btns[e.button] || 'right'
-  let { ctrlKey, shiftKey, altKey, metaKey } = e
-  let { drag } = mb[btn]
-  mb[btn] = {}
+  let down = mb[btn]
+  mb[btn] = false
+  if (!down || typeof down !== 'object' || !('ovp' in down)) return
+  let { drag, ctrlKey, shiftKey, altKey, metaKey } = down
   if (drag) return
   const keys = []
   if (ctrlKey) keys.unshift('ctrl')
