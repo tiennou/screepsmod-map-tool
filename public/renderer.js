@@ -9,6 +9,9 @@ let vp = { x: 0, y: 0, z: 1 }
 let hoverModifiers = { ctrlKey: false, shiftKey: false, altKey: false, metaKey: false }
 
 let scale = 1
+const MIN_SCALE = 0.25
+const MAX_SCALE = 8
+const SCALE_STEP = 0.25
 let flood = false
 
 let overlay = ''
@@ -87,8 +90,8 @@ function previewTypes() {
 
 canvas.addEventListener('wheel', e => {
   const oldScale = scale
-  if (e.deltaY > 0 && scale > 1) scale--
-  if (e.deltaY < 0 && scale < 8) scale++
+  if (e.deltaY > 0 && scale > MIN_SCALE) scale = Math.max(MIN_SCALE, scale - SCALE_STEP)
+  if (e.deltaY < 0 && scale < MAX_SCALE) scale = Math.min(MAX_SCALE, scale + SCALE_STEP)
   if (oldScale !== scale) {
     mp = { x: e.clientX, y: e.clientY }
     let [x, y] = [-vp.x, -vp.y]
@@ -224,7 +227,7 @@ function getHoverScope() {
 }
 
 const controlHintsGlobal = [
-  { combo: 'Scroll wheel', desc: 'Zoom 1×–8× (toward cursor)' },
+  { combo: 'Scroll wheel', desc: 'Zoom 0.25×–8× (toward cursor)' },
   { combo: 'Drag (hold left)', desc: 'Pan map' },
   { combo: 'Arrow keys', desc: 'Pan map' },
 ]
@@ -583,13 +586,28 @@ function render() {
 }
 
 let imageCache = {}
+let terrainCanvasCache = {}
+
+function getTerrainCanvas(terrainStr) {
+  const terrainScale = Math.max(1, Math.ceil(scale))
+  const key = `${terrainStr}:${terrainScale}`
+  if (!terrainCanvasCache[key]) {
+    const img = utils.writeTerrainToPng(terrainStr, terrainScale)
+    const canvas = document.createElement('canvas')
+    canvas.width = 50 * terrainScale
+    canvas.height = 50 * terrainScale
+    canvas.getContext('2d').putImageData(img, 0, 0)
+    terrainCanvasCache[key] = canvas
+  }
+  return terrainCanvasCache[key]
+}
 
 function renderRoom(ctx, room) {
   if (!room.terrain) return
-  let img = imageCache[room.terrain + scale] = imageCache[room.terrain + scale] || utils.writeTerrainToPng(room.terrain, scale)
   let rx = room.x * 50 * scale
   let ry = room.y * 50 * scale
-  ctx.putImageData(img, vp.x + rx, vp.y + ry)
+  const terrainCanvas = getTerrainCanvas(room.terrain)
+  ctx.drawImage(terrainCanvas, rx, ry, 50 * scale, 50 * scale)
   if (flood) return
   if (room.status !== 'normal') {
     ctx.save()
